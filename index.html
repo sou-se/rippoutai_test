@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>立体の展開図</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="展開図">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#eef5f1; --grid:#cfe0d8; --panel:#ffffff; --ink:#1f3044; --muted:#5b6b7c;
+  --line:#c3d2cb; --pick:#1f3044; --pick-ink:#ffffff; --cell:#8fa3b3;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#16212b; --grid:#22313d; --panel:#1d2a36; --ink:#e8eef2; --muted:#a3b3c0;
+    --line:#34475a; --pick:#e8eef2; --pick-ink:#16212b; --cell:#7d93a5;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#16212b; --grid:#22313d; --panel:#1d2a36; --ink:#e8eef2; --muted:#a3b3c0;
+  --line:#34475a; --pick:#e8eef2; --pick-ink:#16212b; --cell:#7d93a5;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%}
+body{
+  margin:0; height:100%; display:grid; grid-template-rows:auto minmax(0,1fr) auto;
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;
+  color:var(--ink);
+  font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",sans-serif;
+  font-weight:500; -webkit-text-size-adjust:100%;
+}
+header{padding:12px 18px 4px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+h1{margin:0; font-size:1.45rem; font-weight:700; letter-spacing:.04em}
+header p{margin:0; color:var(--muted); font-size:.9rem}
+#stage{position:relative; min-height:220px}
+#stage canvas{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:grab}
+#panel{
+  background:var(--panel); border-top:2px solid var(--ink);
+  padding:12px 18px 14px; display:grid; gap:12px;
+}
+.fold{display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px; font-weight:700}
+input[type=range]{width:100%; height:36px; accent-color:var(--ink)}
+.row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+button{font:inherit; color:inherit}
+#play{
+  background:var(--pick); color:var(--pick-ink); border:0; border-radius:999px;
+  padding:10px 20px; font-weight:700; font-size:1rem; min-height:44px;
+}
+.step{background:var(--panel); border:2px solid var(--ink); border-radius:999px; padding:10px 18px; font-weight:700; font-size:1rem; min-height:44px; flex:1}
+label.check{display:inline-flex; align-items:center; gap:6px; min-height:44px; font-weight:700}
+label.check input{width:22px; height:22px; accent-color:var(--ink)}
+.note{margin:0; color:var(--muted); font-size:.85rem; line-height:1.6}
+.sw{display:inline-block; width:.9em; height:.9em; border-radius:3px; vertical-align:-.08em; margin-right:1px; border:1px solid var(--ink)}
+h2{margin:0 0 6px; font-size:.95rem; font-weight:700}
+#nets{display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:8px}
+#nets button{
+  background:transparent; border:2px solid var(--line); border-radius:10px;
+  padding:6px; min-height:52px; display:grid; place-items:center;
+}
+#nets button[aria-pressed="true"]{border-color:var(--ink); background:var(--paper)}
+#nets svg{width:44px; height:34px}
+#nets rect{fill:var(--cell); stroke:var(--panel); stroke-width:1}
+#nets button[aria-pressed="true"] rect{fill:var(--ink)}
+#solids,#qsel{display:flex; flex-wrap:wrap; gap:8px}
+#solids button,#qsel button{background:transparent; border:2px solid var(--line); border-radius:999px; padding:8px 14px; min-height:44px; font-weight:700}
+#solids button[aria-pressed="true"],#qsel button[aria-pressed="true"]{border-color:var(--ink); background:var(--pick); color:var(--pick-ink)}
+[hidden]{display:none !important}
+#modes{display:flex; gap:6px; margin-left:auto}
+#modes button{background:var(--panel); border:2px solid var(--ink); border-radius:999px; padding:6px 16px; min-height:40px; font-weight:700}
+#modes button[aria-pressed="true"]{background:var(--pick); color:var(--pick-ink)}
+#quiz{display:grid; gap:10px}
+#qrow{display:flex; gap:12px; align-items:center}
+#qfig{width:118px; flex:none}
+#qfig svg{display:block; width:100%}
+#qfig line{stroke:var(--ink); stroke-width:2; stroke-linecap:round}
+#qfig text{fill:var(--ink); font-size:13px; font-weight:700}
+#qtext{margin:0; font-size:1.15rem; font-weight:700; line-height:1.6}
+#choices{display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:8px}
+#choices button{background:var(--panel); color:var(--ink); border:2px solid var(--ink); border-radius:12px; min-height:52px; font-size:1.15rem; font-weight:700; padding:6px 10px; opacity:1; -webkit-text-fill-color:currentColor}
+#choices button.ok{background:#bfe9c4; color:#12351a; border-color:#2e8b3d}
+#choices button.ng{background:#f6c5c5; color:#4a1212; border-color:#c0392b}
+#result{margin:0; font-weight:700; min-height:1.6em}
+body.quiz #solidsWrap,body.quiz #netsWrap,body.quiz #colorNote,body.quiz label.check{display:none}
+body.locked .fold,body.locked .ctl{opacity:.35}
+button:focus-visible,input:focus-visible{outline:3px solid #f2a516; outline-offset:2px}
+@media (orientation:landscape) and (min-width:820px){
+  body{grid-template-columns:minmax(0,1fr) 340px; grid-template-rows:auto minmax(0,1fr)}
+  header{grid-column:1 / -1}
+  #panel{border-top:0; border-left:2px solid var(--ink); align-content:start; overflow-y:auto; padding-top:16px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>立体の展開図</h1>
+  <p>指でなぞると回せます。2本の指で大きさを変えられます。</p>
+  <div id="modes">
+    <button id="modeP" type="button" aria-pressed="true">れんしゅう</button>
+    <button id="modeQ" type="button" aria-pressed="false">問題コーナー</button>
+  </div>
+</header>
+
+<div id="stage"><canvas id="cv" aria-label="展開図と立方体の3D表示"></canvas></div>
+
+<div id="panel">
+  <div id="quiz" hidden>
+    <h2>出題する立体をえらぶ</h2>
+    <div id="qsel"></div>
+    <p id="score" class="note"></p>
+    <div id="qrow">
+      <div id="qfig" hidden>
+        <svg viewBox="0 0 130 120" role="img" aria-label="立方体の見取図。上の面の頂点がA、B、C、D、その真下がE、F、G、H">
+          <line x1="20" y1="45" x2="80" y2="45"/><line x1="80" y1="45" x2="80" y2="105"/><line x1="80" y1="105" x2="20" y2="105"/><line x1="20" y1="105" x2="20" y2="45"/>
+          <line x1="50" y1="20" x2="110" y2="20"/><line x1="50" y1="20" x2="20" y2="45"/><line x1="110" y1="20" x2="80" y2="45"/><line x1="110" y1="20" x2="110" y2="80"/><line x1="110" y1="80" x2="80" y2="105"/>
+          <g stroke-dasharray="4 4"><line x1="50" y1="20" x2="50" y2="80"/><line x1="50" y1="80" x2="110" y2="80"/><line x1="50" y1="80" x2="20" y2="105"/></g>
+          <text x="38" y="16">A</text><text x="114" y="16">B</text><text x="84" y="58">C</text><text x="6" y="44">D</text>
+          <text x="54" y="76">E</text><text x="115" y="88">F</text><text x="84" y="118">G</text><text x="6" y="116">H</text>
+        </svg>
+      </div>
+      <p id="qtext"></p>
+    </div>
+    <div id="choices"></div>
+    <p id="result" role="status"></p>
+    <button id="nextQ" class="step" type="button" hidden>つぎの問題 ▶</button>
+  </div>
+  <div id="solidsWrap">
+    <h2>立体をえらぶ</h2>
+    <div id="solids"></div>
+  </div>
+  <div class="fold">
+    <span>ひらく</span>
+    <input id="slider" type="range" min="0" max="100" value="0" aria-label="組み立てぐあい">
+    <span>組み立てる</span>
+  </div>
+  <div class="row ctl">
+    <button id="prev" class="step" type="button">◀ 1つもどす</button>
+    <button id="next" class="step" type="button">1つ折る ▶</button>
+  </div>
+  <div class="row ctl">
+    <button id="play" type="button">▶ 自動で組み立てる</button>
+    <label class="check"><input id="showLabels" type="checkbox" checked>頂点の記号</label>
+  </div>
+  <p class="note" id="colorNote">
+    <span class="sw" style="background:#f6c443"></span><span class="sw" style="background:#62b6e0"></span><span class="sw" style="background:#f28fa6"></span>
+    同じ色の面は、組み立てると平行になります（向かい合う面）。同じ記号の点は、組み立てると1つの頂点に集まります。
+  </p>
+  <div id="netsWrap">
+    <h2>立方体の展開図をえらぶ（全部で11種類）</h2>
+    <div id="nets"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// CORE-START
+const NETS=[
+  ["X...","XXXX","X..."],
+  ["X...","XXXX",".X.."],
+  ["X...","XXXX","..X."],
+  ["X...","XXXX","...X"],
+  [".X..","XXXX",".X.."],
+  [".X..","XXXX","..X."],
+  ["XX..",".XXX",".X.."],
+  ["XX..",".XXX","..X."],
+  ["XX..",".XXX","...X"],
+  ["XX..",".XX.","..XX"],
+  ["XXX..","..XXX"]
+];
+function buildNet(rows){
+  const cells=[];
+  rows.forEach((s,r)=>{for(let c=0;c<s.length;c++)if(s[c]==='X')cells.push({c,r,parent:null,dc:0,dr:0,M:null})});
+  const at=new Map(cells.map(k=>[k.c+','+k.r,k]));
+  const D=[[1,0],[-1,0],[0,1],[0,-1]];
+  const deg=k=>D.filter(([a,b])=>at.has((k.c+a)+','+(k.r+b))).length;
+  let root=cells[0];
+  for(const k of cells)if(deg(k)>deg(root))root=k;
+  const order=[root],seen=new Set([root]);
+  for(let i=0;i<order.length;i++){
+    const p=order[i];
+    for(const [a,b] of D){
+      const n=at.get((p.c+a)+','+(p.r+b));
+      if(n&&!seen.has(n)){seen.add(n);n.parent=p;n.dc=a;n.dr=b;order.push(n)}
+    }
+  }
+  return {order,root};
+}
+function hinge(k,theta,T){
+  const r=new T.Matrix4(),a=new T.Matrix4(),b=new T.Matrix4();
+  let p,phi,isY;
+  if(k.dc===1){p=[k.c,0];phi=-theta;isY=true}
+  else if(k.dc===-1){p=[k.c+1,0];phi=theta;isY=true}
+  else if(k.dr===1){p=[0,-k.r];phi=-theta;isY=false}
+  else{p=[0,-(k.r+1)];phi=theta;isY=false}
+  if(isY)r.makeRotationY(phi);else r.makeRotationX(phi);
+  a.makeTranslation(p[0],p[1],0);b.makeTranslation(-p[0],-p[1],0);
+  return a.multiply(r).multiply(b);
+}
+function cubeSolid(rows,T){
+  const net=buildNet(rows);
+  for(const k of net.order){k.M=new T.Matrix4();if(k.parent)k.M.multiplyMatrices(k.parent.M,hinge(k,Math.PI/2,T))}
+  const faces=net.order.map((k,i)=>({
+    pts:[[k.c,-k.r],[k.c+1,-k.r],[k.c+1,-k.r-1],[k.c,-k.r-1]].map(([x,y])=>new T.Vector3(x,y,0).applyMatrix4(k.M)),
+    parent:k.parent?net.order.indexOf(k.parent):-1,stage:i-1}));
+  return {faces,labels:true};
+}
+// 底面の多角形から、柱(s=1)・すい(s=0)・すい台(0<s<1)を作る
+function frustum(o,T){
+  const B=o.base,n=B.length;let cx=0,cy=0;
+  B.forEach(p=>{cx+=p[0]/n;cy+=p[1]/n});
+  const bot=B.map(p=>new T.Vector3(p[0],p[1],0));
+  const apex=new T.Vector3(cx,cy,o.h);
+  const top=o.s>0?B.map(p=>new T.Vector3(cx+(p[0]-cx)*o.s,cy+(p[1]-cy)*o.s,o.h)):null;
+  const faces=[{pts:bot,parent:-1,stage:-1}];
+  const mid=Math.floor(n/2),ord=[];
+  for(let d=1;d<n;d++){if(mid+d<n)ord.push(mid+d);if(mid-d>=0)ord.push(mid-d)}
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n;
+    const pts=top?[bot[i],bot[j],top[j],top[i]]:[bot[i],bot[j],apex];
+    let parent,stage;
+    if(o.star){parent=0;stage=i}
+    else{parent=i===mid?0:(i>mid?i:i+2);stage=i===mid?0:(o.smooth?1:1+ord.indexOf(i))}
+    const f={pts,parent,stage};
+    if(o.smooth){
+      f.group='side';f.lines=[[0,1]];
+      if(top)f.lines.push([2,3]);
+      if(i===0)f.lines.push([0,pts.length-1]);
+      if(i===n-1)f.lines.push([1,2]);
+    }
+    faces.push(f);
+  }
+  if(top)faces.push({pts:top,parent:mid+1,stage:o.smooth?2:n});
+  return {faces,labels:!o.smooth};
+}
+function prepare(sol,T){
+  const F=sol.faces,c=new T.Vector3();let m=0;
+  F.forEach(f=>f.pts.forEach(p=>{c.add(p);m++}));c.multiplyScalar(1/m);
+  F.forEach(f=>{
+    const n=new T.Vector3(),P=f.pts,fc=new T.Vector3();
+    for(let i=0;i<P.length;i++){
+      const a=P[i],b=P[(i+1)%P.length];
+      n.x+=(a.y-b.y)*(a.z+b.z);n.y+=(a.z-b.z)*(a.x+b.x);n.z+=(a.x-b.x)*(a.y+b.y);
+      fc.add(a);
+    }
+    n.normalize();fc.multiplyScalar(1/P.length);
+    if(n.dot(fc.sub(c))<0)n.negate();
+    f.n=n;f.M=new T.Matrix4();
+  });
+  let S=0;
+  F.forEach(f=>{
+    if(f.parent<0)return;
+    S=Math.max(S,f.stage+1);
+    const pp=F[f.parent],sh=f.pts.filter(a=>pp.pts.some(b=>a.distanceTo(b)<1e-5));
+    f.p=sh[0].clone();f.e=sh[1].clone().sub(sh[0]).normalize();
+    f.alpha=Math.atan2(f.e.dot(f.n.clone().cross(pp.n)),f.n.dot(pp.n));
+  });
+  sol.S=S;sol.order=[];
+  const q=[F.findIndex(f=>f.parent<0)];
+  while(q.length){const i=q.shift();sol.order.push(F[i]);F.forEach((f,j)=>{if(f.parent===i)q.push(j)})}
+  return sol;
+}
+function pose(sol,t,T){
+  const R=new T.Matrix4(),A=new T.Matrix4(),Bm=new T.Matrix4();
+  for(const f of sol.order){
+    if(f.parent<0){f.M.identity();continue}
+    let s=Math.max(0,Math.min(1,t*sol.S-f.stage));s=s*s*(3-2*s);
+    R.makeRotationAxis(f.e,f.alpha*(1-s));
+    A.makeTranslation(f.p.x,f.p.y,f.p.z);Bm.makeTranslation(-f.p.x,-f.p.y,-f.p.z);
+    f.M.multiplyMatrices(sol.faces[f.parent].M,A).multiply(R).multiply(Bm);
+  }
+}
+const reg=(n,r,rot)=>Array.from({length:n},(_,i)=>{const a=rot+i*2*Math.PI/n;return [r*Math.cos(a),r*Math.sin(a)]});
+const Q=-Math.PI/2;
+const SOLIDS=[
+  {name:'立方体',cube:true},
+  {name:'直方体',make:T=>frustum({base:[[-.8,-.5],[.8,-.5],[.8,.5],[-.8,.5]],s:1,h:.8},T)},
+  {name:'三角柱',make:T=>frustum({base:reg(3,.75,Q),s:1,h:1.4},T)},
+  {name:'円柱',make:T=>frustum({base:reg(64,.6,Q),s:1,h:1.4,smooth:true},T)},
+  {name:'三角すい',make:T=>frustum({base:reg(3,.85,Q),s:0,h:1.2,star:true},T)},
+  {name:'四角すい',make:T=>frustum({base:reg(4,.9,Math.PI/4),s:0,h:1.3,star:true},T)},
+  {name:'円すい',make:T=>frustum({base:reg(64,.6,Q),s:0,h:1.5,smooth:true},T)},
+  {name:'四角すい台',make:T=>frustum({base:reg(4,1,Math.PI/4),s:.5,h:.9,star:true},T)},
+  {name:'円すい台',make:T=>frustum({base:reg(64,.8,Q),s:.5,h:1.1,smooth:true},T)}
+];
+// CORE-END
+
+(function(){
+  const T=THREE;
+  const PAL=['#f6c443','#62b6e0','#f28fa6','#8fd08a','#b79be8','#f5a25d'];
+  const PLAIN='#d5dfe8',ASK='#ffd84a',HIT='#7fdc8a';
+  const KANA='アイウエオカキクケコサシスセソタチツテト';
+  const $=id=>document.getElementById(id);
+  const cv=$('cv'),stage=$('stage'),slider=$('slider'),play=$('play');
+  const showLabels=$('showLabels'),netsEl=$('nets'),solidsEl=$('solids'),netsWrap=$('netsWrap');
+  const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rnd=n=>Math.floor(Math.random()*n),pick=a=>a[rnd(a.length)];
+  const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+
+  let renderer;
+  try{renderer=new T.WebGLRenderer({canvas:cv,antialias:true,alpha:true})}
+  catch(e){stage.textContent='この端末では3D表示が使えません。別のブラウザでひらいてください。';return}
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  const scene=new T.Scene();
+  const camera=new T.PerspectiveCamera(40,1,0.1,100);
+  scene.add(new T.AmbientLight(0xffffff,0.78));
+  const sun=new T.DirectionalLight(0xffffff,0.45);sun.position.set(3,6,4);scene.add(sun);
+  const tilt=new T.Group();tilt.rotation.x=-Math.PI/2;scene.add(tilt);
+  const inner=new T.Group();tilt.add(inner);
+
+  const texCache={};
+  function letterTex(ch,bg){
+    bg=bg||'#ffffff';const key=ch+bg;
+    if(texCache[key])return texCache[key];
+    const c=document.createElement('canvas');c.width=c.height=128;
+    const g=c.getContext('2d');
+    g.beginPath();g.arc(64,64,54,0,Math.PI*2);g.fillStyle=bg;g.fill();
+    g.lineWidth=8;g.strokeStyle='#1f3044';g.stroke();
+    g.fillStyle='#1f3044';g.font='700 '+(ch.charCodeAt(0)>255?68:76)+'px "Zen Maru Gothic","Hiragino Sans",sans-serif';
+    g.textAlign='center';g.textBaseline='middle';g.fillText(ch,64,70);
+    const t=new T.CanvasTexture(c);texCache[key]=t;return t;
+  }
+
+  let sol=null,groups=[],labels=[],t=0,anim=null,si=0,ni=0,radius=3;
+  let quiz=null,score=[0,0],lastKind='';
+  let az=0.5,el=0.9,zoom=1;
+  const v=new T.Vector3(),lo=new T.Vector3(),hi=new T.Vector3();
+  const near=(a,b)=>a.distanceTo(b)<1e-5;
+  const reading=(a,b)=>(Math.round(b.q.y*100)-Math.round(a.q.y*100))||(a.q.x-b.q.x);
+
+  function clearLabels(){for(const l of labels){inner.remove(l.sp);l.sp.material.dispose()}labels=[]}
+  function addLabel(f,p,ch,bg){
+    const sp=new T.Sprite(new T.SpriteMaterial({map:letterTex(ch,bg),depthTest:false,transparent:true}));
+    sp.scale.set(0.3,0.3,1);sp.renderOrder=10;inner.add(sp);
+    const l={f,p,sp,ch};labels.push(l);return l;
+  }
+  const vLetter=p=>'ABCDEFGHIJKL'[sol.uniq.findIndex(u=>near(u,p))];
+  function vertexLabels(){
+    clearLabels();if(!sol.labels)return;
+    for(const f of sol.faces)for(const p of f.pts)addLabel(f,p,vLetter(p));
+  }
+  // 展開図の上の点（同じ場所の点は1つにまとめる）
+  function flatPoints(){
+    const out=[];
+    sol.faces.forEach(f=>f.pts.forEach((p,j)=>{
+      const q=f.flat[j];
+      if(!out.some(o=>near(o.q,q)))out.push({f,p,q,v:sol.uniq.findIndex(u=>near(u,p))});
+    }));
+    out.sort(reading);out.forEach((o,i)=>{o.ch=KANA[i]});
+    return out;
+  }
+
+  function load(){
+    clearLabels();
+    while(inner.children.length){
+      const o=inner.children[0];inner.remove(o);
+      o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)n.material.dispose()});
+    }
+    groups=[];
+    sol=prepare(SOLIDS[si].cube?cubeSolid(NETS[ni],T):SOLIDS[si].make(T),T);
+    pose(sol,0,T);
+    sol.faces.forEach(f=>{f.flat=f.pts.map(p=>p.clone().applyMatrix4(f.M))});
+    const keys=[];
+    const keyOf=f=>{
+      if(f.group)return f.group;
+      const a=[f.n.x,f.n.y,f.n.z];let sg=1;
+      for(const q of a)if(Math.abs(q)>1e-4){sg=Math.sign(q);break}
+      return a.map(q=>Math.round(q*sg*100)+0).join();
+    };
+    const uniq=sol.uniq=[];
+    if(sol.labels){
+      sol.faces.forEach(f=>f.pts.forEach(p=>{if(!uniq.some(u=>near(u,p)))uniq.push(p)}));
+      let cx=0,cy=0;uniq.forEach(p=>{cx+=p.x/uniq.length;cy+=p.y/uniq.length});
+      const ang=p=>Math.hypot(p.x-cx,p.y-cy)<1e-5?-9:-Math.atan2(p.y-cy,p.x-cx);
+      uniq.sort((a,b)=>(Math.round(b.z*1000)-Math.round(a.z*1000))||(ang(a)-ang(b)));
+    }
+    for(const f of sol.faces){
+      const k=keyOf(f);if(!keys.includes(k))keys.push(k);
+      f.color=PAL[keys.indexOf(k)%PAL.length];
+      const P=f.pts,pos=new Float32Array(P.length*3),idx=[];
+      P.forEach((p,j)=>{pos[j*3]=p.x;pos[j*3+1]=p.y;pos[j*3+2]=p.z});
+      for(let j=1;j<P.length-1;j++)idx.push(0,j,j+1);
+      const geo=new T.BufferGeometry();
+      geo.setAttribute('position',new T.BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();
+      const g=new T.Group();g.matrixAutoUpdate=false;
+      f.mesh=new T.Mesh(geo,new T.MeshLambertMaterial({color:quiz?PLAIN:f.color,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}));
+      g.add(f.mesh);
+      const segs=f.lines||P.map((_,j)=>[j,(j+1)%P.length]),lp=new Float32Array(segs.length*6);
+      segs.forEach(([a,b],j)=>{lp.set([P[a].x,P[a].y,P[a].z,P[b].x,P[b].y,P[b].z],j*6)});
+      const lgeo=new T.BufferGeometry();lgeo.setAttribute('position',new T.BufferAttribute(lp,3));
+      g.add(new T.LineSegments(lgeo,new T.LineBasicMaterial({color:0x1f3044})));
+      inner.add(g);groups.push({f,g});
+    }
+    if(quiz)setupQuestion();else vertexLabels();
+    [...solidsEl.children].forEach((b,j)=>b.setAttribute('aria-pressed',j===si?'true':'false'));
+    [...netsEl.children].forEach((b,j)=>b.setAttribute('aria-pressed',j===ni?'true':'false'));
+    netsWrap.hidden=!SOLIDS[si].cube;
+    showLabels.disabled=!sol.labels;
+    anim=null;setT(0);lock();
+  }
+
+  function setT(nt){
+    t=Math.max(0,Math.min(1,nt));
+    slider.value=Math.round(t*100);
+    play.textContent=t>0.5?'◀ 自動でひらく':'▶ 自動で組み立てる';
+    pose(sol,t,T);
+    lo.set(1e9,1e9,1e9);hi.set(-1e9,-1e9,-1e9);
+    for(const {f,g} of groups){
+      g.matrix.copy(f.M);g.matrixWorldNeedsUpdate=true;
+      for(const p of f.pts){v.copy(p).applyMatrix4(f.M);lo.min(v);hi.max(v)}
+    }
+    for(const l of labels){l.sp.position.copy(l.p).applyMatrix4(l.f.M);l.sp.visible=quiz?true:showLabels.checked}
+    inner.position.copy(lo).add(hi).multiplyScalar(-0.5);
+    radius=Math.max(1.1,lo.distanceTo(hi)/2);
+  }
+
+  // ---- 問題コーナー ----
+  function setupQuestion(){
+    const Q=quiz;let text,choices,answer;
+    $('qfig').hidden=Q.kind!=='vertex';
+    if(Q.kind==='solid'){
+      answer=SOLIDS[si].name;
+      choices=shuffle([answer].concat(shuffle(SOLIDS.map(s=>s.name).filter(n=>n!==answer)).slice(0,3)));
+      text='この展開図を組み立てると、どの立体になる？';
+      Q.reveal=()=>{sol.faces.forEach(f=>f.mesh.material.color.set(f.color))};
+    }else if(Q.kind==='face'){
+      const fs=sol.faces.map(f=>{
+        const c=new T.Vector3();f.pts.forEach(p=>c.add(p));c.multiplyScalar(1/f.pts.length);
+        return {f,c,q:c.clone().applyMatrix4(f.M)};
+      });
+      fs.sort(reading);fs.forEach((o,i)=>{o.ch=KANA[i];addLabel(o.f,o.c,o.ch)});
+      const opp=o=>fs.filter(x=>x.f.n.dot(o.f.n)<-0.99);
+      const a=pick(fs.filter(o=>opp(o).length===1)),b=opp(a)[0];
+      answer=b.ch;choices=fs.filter(o=>o!==a).map(o=>o.ch);
+      text='組み立てたとき、面'+a.ch+'と向かい合う（平行になる）面はどれ？';
+      Q.reveal=()=>{a.f.mesh.material.color.set(ASK);b.f.mesh.material.color.set(HIT)};
+    }else if(Q.kind==='point'){
+      const fp=flatPoints();fp.forEach(o=>{o.l=addLabel(o.f,o.p,o.ch)});
+      const a=pick(fp.filter(o=>fp.some(x=>x!==o&&x.v===o.v)));
+      const b=pick(fp.filter(o=>o!==a&&o.v===a.v));
+      const ds=shuffle(fp.filter(o=>o.v!==a.v)).slice(0,3);
+      answer=b.ch;
+      choices=[b].concat(ds).sort((x,y)=>KANA.indexOf(x.ch)-KANA.indexOf(y.ch)).map(o=>o.ch);
+      text='組み立てたとき、点'+a.ch+'と重なる点はどれ？';
+      Q.reveal=()=>{
+        a.l.sp.material.map=letterTex(a.ch,ASK);b.l.sp.material.map=letterTex(b.ch,HIT);
+        a.l.sp.renderOrder=12;b.l.sp.renderOrder=11;
+      };
+    }else{
+      const fp=flatPoints(),g=pick(sol.faces);
+      const onG=o=>g.flat.some(q=>near(q,o.q));
+      fp.filter(onG).forEach(o=>addLabel(o.f,o.p,vLetter(o.p)));
+      const a=pick(fp.filter(o=>!onG(o)));
+      addLabel(a.f,a.p,'？',ASK);
+      answer=vLetter(a.p);
+      choices=[answer].concat(shuffle('ABCDEFGHIJKL'.slice(0,sol.uniq.length).split('').filter(c=>c!==answer)).slice(0,3)).sort();
+      text='？の点は、左の図のどの頂点になる？';drawFig();
+      Q.reveal=()=>{vertexLabels()};
+    }
+    $('qtext').textContent=text;$('result').textContent='';
+    const box=$('choices');box.textContent='';
+    choices.forEach(c=>{
+      const b=document.createElement('button');b.type='button';b.textContent=c;
+      b.addEventListener('click',()=>answerQ(c,b,answer));box.appendChild(b);
+    });
+    $('nextQ').hidden=true;
+  }
+  function answerQ(c,btn,answer){
+    if(!quiz||quiz.done)return;
+    quiz.done=true;score[1]++;
+    const ok=c===answer;if(ok)score[0]++;
+    [...$('choices').children].forEach(b=>{b.disabled=true;if(b.textContent===answer)b.classList.add('ok')});
+    if(!ok)btn.classList.add('ng');
+    $('result').textContent=ok?'正解！ 組み立ててたしかめよう。':'おしい！ 正しい答えは「'+answer+'」。組み立ててたしかめよう。';
+    showScore();quiz.reveal();setT(t);lock();$('nextQ').hidden=false;
+    go(1,1700);
+  }
+  function showScore(){$('score').textContent=score[1]?score[1]+'問中 '+score[0]+'問 正解':'答えをえらぶと、組み立てて答え合わせができます。'}
+  // 見取図（組み立てた形）を自動でかく。かくれた辺は点線
+  function drawFig(){
+    const ph=-0.45,th=0.42,c=Math.cos(ph),s=Math.sin(ph),ct=Math.cos(th),st=Math.sin(th);
+    const U=sol.uniq,P=U.map(p=>{const y=p.x*s+p.y*c;return [p.x*c-p.y*s,-(p.z*ct+y*st)]});
+    const front=f=>{const ny=f.n.x*s+f.n.y*c;return -ny*ct+f.n.z*st>1e-6};
+    const E={};
+    sol.faces.forEach(f=>{
+      const id=f.pts.map(p=>U.findIndex(u=>near(u,p))),fr=front(f);
+      id.forEach((a,j)=>{const b=id[(j+1)%id.length],k=Math.min(a,b)+'-'+Math.max(a,b);E[k]=E[k]||{a,b,vis:false};if(fr)E[k].vis=true});
+    });
+    const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]);
+    const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+    const k=Math.min(92/(x1-x0),82/(y1-y0)),ox=62-(x0+x1)/2*k,oy=57-(y0+y1)/2*k;
+    const S=P.map(p=>[p[0]*k+ox,p[1]*k+oy]);
+    let h='<svg viewBox="0 0 124 114" role="img" aria-label="立体の見取図">';
+    Object.values(E).sort((m,n)=>m.vis-n.vis).forEach(e=>{
+      h+='<line x1="'+S[e.a][0].toFixed(1)+'" y1="'+S[e.a][1].toFixed(1)+'" x2="'+S[e.b][0].toFixed(1)+'" y2="'+S[e.b][1].toFixed(1)+'"'+(e.vis?'':' stroke-dasharray="3 4"')+'/>';
+    });
+    S.forEach((p,i)=>{
+      let dx=p[0]-62,dy=p[1]-57;const d=Math.hypot(dx,dy)||1;
+      h+='<text text-anchor="middle" dominant-baseline="central" x="'+(p[0]+dx/d*10).toFixed(1)+'" y="'+(p[1]+dy/d*10).toFixed(1)+'">'+'ABCDEFGHIJKL'[i]+'</text>';
+    });
+    $('qfig').innerHTML=h+'</svg>';
+  }
+  const POLY=[0,1,2,4,5,7],PAR=[0,1,2,7];
+  let qsel=-1;
+  function newQuestion(){
+    let kind,s;
+    if(qsel<0){
+      kind=pick(['solid','face','point','vertex'].filter(k=>k!==lastKind));
+      s=kind==='solid'?rnd(SOLIDS.length):kind==='face'?pick(PAR):pick(POLY);
+    }else{
+      s=qsel;
+      const ks=['point','vertex'].concat(PAR.includes(s)?['face']:[]),k2=ks.filter(k=>k!==lastKind);
+      kind=pick(k2.length?k2:ks);
+    }
+    lastKind=kind;
+    si=s;ni=rnd(NETS.length);
+    quiz={kind,done:false};load();
+  }
+  function lock(){
+    const on=!!quiz&&!quiz.done;
+    document.body.classList.toggle('locked',on);
+    [slider,play,$('prev'),$('next')].forEach(e=>{e.disabled=on});
+  }
+  function setMode(q){
+    document.body.classList.toggle('quiz',q);$('quiz').hidden=!q;
+    $('modeP').setAttribute('aria-pressed',q?'false':'true');$('modeQ').setAttribute('aria-pressed',q?'true':'false');
+    if(q){score=[0,0];lastKind='';showScore();newQuestion()}
+    else{quiz=null;si=0;ni=0;load()}
+  }
+  $('modeP').addEventListener('click',()=>setMode(false));
+  $('modeQ').addEventListener('click',()=>setMode(true));
+  $('nextQ').addEventListener('click',newQuestion);
+
+  function resize(){
+    const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;
+    renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+  }
+  if(window.ResizeObserver)new ResizeObserver(resize).observe(stage);
+  window.addEventListener('resize',resize);resize();
+
+  function frame(now){
+    if(anim){
+      const p=Math.min(1,(now-anim.t0)/anim.dur);
+      setT(anim.from+(anim.to-anim.from)*p);
+      if(p>=1)anim=null;
+    }
+    const d=radius*3.1*zoom/Math.min(1,camera.aspect*0.85);
+    camera.position.set(d*Math.cos(el)*Math.sin(az),d*Math.sin(el),d*Math.cos(el)*Math.cos(az));
+    camera.lookAt(0,0,0);
+    renderer.render(scene,camera);
+    requestAnimationFrame(frame);
+  }
+
+  function go(to,per){
+    to=Math.max(0,Math.min(1,to));
+    if(reduce){anim=null;setT(to);return}
+    anim={from:t,to,t0:performance.now(),dur:Math.max(350,per*sol.S*Math.abs(to-t))};
+  }
+  slider.addEventListener('input',()=>{anim=null;setT(slider.value/100)});
+  showLabels.addEventListener('change',()=>setT(t));
+  play.addEventListener('click',()=>go(t>0.5?0:1,1700));
+  $('next').addEventListener('click',()=>go((Math.floor(t*sol.S+1e-6)+1)/sol.S,1200));
+  $('prev').addEventListener('click',()=>go((Math.ceil(t*sol.S-1e-6)-1)/sol.S,1200));
+
+  const pts=new Map();
+  cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){ }pts.set(e.pointerId,[e.clientX,e.clientY])});
+  cv.addEventListener('pointermove',e=>{
+    const prev=pts.get(e.pointerId);if(!prev)return;
+    if(pts.size===1){
+      az-=(e.clientX-prev[0])*0.008;
+      el=Math.max(-1.5,Math.min(1.5,el+(e.clientY-prev[1])*0.008));
+    }else if(pts.size===2){
+      const other=[...pts.entries()].find(([id])=>id!==e.pointerId)[1];
+      const d0=Math.hypot(prev[0]-other[0],prev[1]-other[1]),d1=Math.hypot(e.clientX-other[0],e.clientY-other[1]);
+      if(d0>0&&d1>0)zoom=Math.max(0.5,Math.min(2,zoom*d0/d1));
+    }
+    pts.set(e.pointerId,[e.clientX,e.clientY]);
+  });
+  const drop=e=>pts.delete(e.pointerId);
+  cv.addEventListener('pointerup',drop);cv.addEventListener('pointercancel',drop);
+  cv.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(0.5,Math.min(2,zoom*Math.exp(e.deltaY*0.001)))},{passive:false});
+
+  SOLIDS.forEach((s,i)=>{
+    const b=document.createElement('button');b.type='button';b.textContent=s.name;
+    b.addEventListener('click',()=>{si=i;load()});
+    solidsEl.appendChild(b);
+  });
+  NETS.forEach((rows,i)=>{
+    const b=document.createElement('button');b.type='button';
+    b.setAttribute('aria-label','展開図 '+(i+1));
+    const w=rows[0].length,h=rows.length;
+    let s='<svg viewBox="0 0 '+w*10+' '+h*10+'" aria-hidden="true">';
+    rows.forEach((r,y)=>{for(let x=0;x<r.length;x++)if(r[x]==='X')s+='<rect x="'+x*10+'" y="'+y*10+'" width="10" height="10"/>'});
+    b.innerHTML=s+'</svg>';
+    b.addEventListener('click',()=>{ni=i;load()});
+    netsEl.appendChild(b);
+  });
+
+  [-1].concat(POLY).forEach(i=>{
+    const b=document.createElement('button');b.type='button';b.textContent=i<0?'おまかせ':SOLIDS[i].name;
+    b.setAttribute('aria-pressed',i===qsel?'true':'false');
+    b.addEventListener('click',()=>{
+      qsel=i;[...$('qsel').children].forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+      lastKind='';newQuestion();
+    });
+    $('qsel').appendChild(b);
+  });
+
+  load();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
